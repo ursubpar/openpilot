@@ -120,12 +120,14 @@ class CarState(CarStateBase):
     if CP.carFingerprint not in PREGLOBAL_CARS:
       signals += [
         ("Steer_Warning", "Steering_Torque", 0),
+        ("Brake", "Brake_Status", 0),
       ]
 
       checks += [
         ("Dashlights", 10),
         ("BodyInfo", 10),
         ("CruiseControl", 20),
+        ("Brake_Status", 50),
       ]
 
     if CP.carFingerprint in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
