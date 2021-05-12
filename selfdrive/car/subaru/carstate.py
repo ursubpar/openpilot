@@ -115,7 +115,6 @@ class CarState(CarStateBase):
       ("Steer_Torque_Sensor", "Steering_Torque", 0),
       ("Steering_Angle", "Steering_Torque", 0),
       ("Brake_Pedal", "Brake_Pedal", 0),
-      ("Throttle_Pedal", "Throttle", 0),
       ("LEFT_BLINKER", "Dashlights", 0),
       ("RIGHT_BLINKER", "Dashlights", 0),
       ("SEATBELT_FL", "Dashlights", 0),
@@ -185,33 +184,46 @@ class CarState(CarStateBase):
 
       if CP.carFingerprint != CAR.OUTBACK:
         signals += [
-          ("Cruise_On", "CruiseControl", 0),
-          ("Cruise_Activated", "CruiseControl", 0),
-          ("FL", "Wheel_Speeds", 0),
-          ("FR", "Wheel_Speeds", 0),
-          ("RL", "Wheel_Speeds", 0),
-          ("RR", "Wheel_Speeds", 0),
           ("Brake", "Brake_Status", 0),
         ]
 
         checks += [
-          ("Wheel_Speeds", 50),
           ("Brake_Status", 50),
-          ("CruiseControl", 20),
         ]
 
-    if CP.carFingerprint in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
-      checks += [
-        ("Dashlights", 20),
-        ("BodyInfo", 1),
-        ("CruiseControl", 50),
+    if CP.carFingerprint != CAR.OUTBACK:
+      signals += [
+        ("Cruise_On", "CruiseControl", 0),
+        ("Cruise_Activated", "CruiseControl", 0),
+        ("FL", "Wheel_Speeds", 0),
+        ("FR", "Wheel_Speeds", 0),
+        ("RL", "Wheel_Speeds", 0),
+        ("RR", "Wheel_Speeds", 0),
       ]
 
-    if CP.carFingerprint in [CAR.LEGACY_PREGLOBAL, CAR.OUTBACK_PREGLOBAL, CAR.OUTBACK_PREGLOBAL_2018]:
       checks += [
-        ("Dashlights", 10),
-        ("CruiseControl", 50),
+        ("Wheel_Speeds", 50),
       ]
+
+      if CP.carFingerprint not in PREGLOBAL_CARS:
+        checks += [
+          ("CruiseControl", 20),
+        ]
+      else:
+        checks += [
+          ("BodyInfo", 1),
+          ("CruiseControl", 50),
+        ]
+
+      if CP.carFingerprint in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
+        checks += [
+          ("Dashlights", 20),
+        ]
+
+      if CP.carFingerprint in [CAR.LEGACY_PREGLOBAL, CAR.OUTBACK_PREGLOBAL, CAR.OUTBACK_PREGLOBAL_2018]:
+        checks += [
+          ("Dashlights", 10),
+        ]
 
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 0)
 
