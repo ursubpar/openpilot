@@ -283,6 +283,7 @@ class CarState(CarStateBase):
       signals = [
         ("Cruise_Set_Speed", "ES_DashStatus", 0),
         ("Conventional_Cruise", "ES_DashStatus", 0),
+        ("Cruise_State", "ES_DashStatus", 0),
 
         ("Counter", "ES_LKAS_State", 0),
         ("Keep_Hands_On_Wheel", "ES_LKAS_State", 0),
