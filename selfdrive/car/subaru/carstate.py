@@ -191,10 +191,12 @@ class CarState(CarStateBase):
           ("FR", "Wheel_Speeds", 0),
           ("RL", "Wheel_Speeds", 0),
           ("RR", "Wheel_Speeds", 0),
+          ("Brake", "Brake_Status", 0),
         ]
 
         checks += [
           ("Wheel_Speeds", 50),
+          ("Brake_Status", 50),
           ("CruiseControl", 20),
         ]
 
