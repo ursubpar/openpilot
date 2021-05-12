@@ -38,14 +38,24 @@ def create_es_lkas(packer, es_lkas_msg, visual_alert, left_line, right_line):
 
   return packer.make_can_msg("ES_LKAS_State", 0, values)
 
-def create_brake(packer, brake_msg, brake_cmd):
+def create_throttle(packer, throttle_msg, throttle_cmd):
 
-  values = copy.copy(brake_msg)
-  if brake_cmd:
-    values["Brake_Pedal"] = 5
-    values["Brake_Lights"] = 1
+  values = copy.copy(throttle_msg)
+  if throttle_cmd:
+    values["Throttle_Pedal"] = 5
 
-  return packer.make_can_msg("Brake_Pedal", 2, values)
+  return packer.make_can_msg("Throttle", 2, values)
+
+def create_brake_pedal(packer, brake_pedal_msg, speed_cmd, brake_cmd):
+
+   values = copy.copy(brake_pedal_msg)
+   if speed_cmd:
+     values["Speed"] = 3
+   if brake_cmd:
+     values["Brake_Pedal"] = 5
+     values["Brake_Lights"] = 1
+
+   return packer.make_can_msg("Brake_Pedal", 2, values)
 
 # *** Subaru Pre-global ***
 
@@ -74,3 +84,13 @@ def create_es_throttle_control(packer, fake_button, es_accel_msg):
   values["Checksum"] = subaru_preglobal_checksum(packer, values, "ES_CruiseThrottle")
 
   return packer.make_can_msg("ES_CruiseThrottle", 0, values)
+
+def create_preglobal_throttle(packer, throttle_msg, throttle_cmd):
+
+  values = copy.copy(throttle_msg)
+  if throttle_cmd:
+    values["Throttle_Pedal"] = 5
+
+  values["Checksum"] = subaru_preglobal_checksum(packer, values, "Throttle")
+
+  return packer.make_can_msg("Throttle", 2, values)

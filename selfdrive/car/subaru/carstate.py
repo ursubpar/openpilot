@@ -5,6 +5,7 @@ from selfdrive.config import Conversions as CV
 from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
 from selfdrive.car.subaru.values import DBC, STEER_THRESHOLD, CAR, PREGLOBAL_CARS
+from common.params import Params
 
 
 class CarState(CarStateBase):
@@ -12,6 +13,9 @@ class CarState(CarStateBase):
     super().__init__(CP)
     can_define = CANDefine(DBC[CP.carFingerprint]['pt'])
     self.shifter_values = can_define.dv["Transmission"]['Gear']
+
+    params = Params()
+    self.has_epb = params.get("ManualParkingBrakeSNGToggle", encoding='utf8') == "0"
 
   def update(self, cp, cp_cam, cp_body):
     ret = car.CarState.new_message()
@@ -23,7 +27,7 @@ class CarState(CarStateBase):
     elif self.car_fingerprint == CAR.OUTBACK:
       ret.brakePressed = cp_body.vl["Brake_Status"]['Brake'] == 1
     else:
-      ret.brakePressed = cp.vl["Brake_Pedal"]['Brake_Pedal'] > 1e-5
+      ret.brakePressed = cp.vl["Brake_Status"]['Brake'] == 1
     ret.brakeLights = ret.brakePressed
 
     if self.car_fingerprint == CAR.OUTBACK:
@@ -64,10 +68,10 @@ class CarState(CarStateBase):
     ret.cruiseState.speed = cp_cam.vl["ES_DashStatus"]['Cruise_Set_Speed'] * CV.KPH_TO_MS
 
     # UDM Forester, Legacy: mph = 0
-    if self.car_fingerprint in [CAR.FORESTER_PREGLOBAL, CAR.LEGACY_PREGLOBAL] and cp.vl["Dash_State"]['Units'] == 0:
+    if self.car_fingerprint in [CAR.FORESTER_PREGLOBAL, CAR.LEGACY_PREGLOBAL, CAR.WRX_PREGLOBAL] and cp.vl["Dash_State"]['Units'] == 0:
       ret.cruiseState.speed *= CV.MPH_TO_KPH
     # EDM Global: mph = 1, 2; All Outback: mph = 1, UDM Forester: mph = 7
-    elif self.car_fingerprint not in [CAR.FORESTER_PREGLOBAL, CAR.LEGACY_PREGLOBAL] and cp.vl["Dash_State"]['Units'] in [1, 2, 7]:
+    elif self.car_fingerprint not in [CAR.FORESTER_PREGLOBAL, CAR.LEGACY_PREGLOBAL, CAR.WRX_PREGLOBAL] and cp.vl["Dash_State"]['Units'] in [1, 2, 7]:
       ret.cruiseState.speed *= CV.MPH_TO_KPH
 
     ret.seatbeltUnlatched = cp.vl["Dashlights"]['SEATBELT_FL'] == 1
@@ -76,19 +80,30 @@ class CarState(CarStateBase):
                         cp.vl["BodyInfo"]['DOOR_OPEN_FR'],
                         cp.vl["BodyInfo"]['DOOR_OPEN_FL']])
     ret.steerError = cp.vl["Steering_Torque"]['Steer_Error_1'] == 1
+    self.throttle_msg = copy.copy(cp.vl["Throttle"])
 
     if self.car_fingerprint in PREGLOBAL_CARS:
       self.button = cp_cam.vl["ES_CruiseThrottle"]["Cruise_Button"]
       self.ready = not cp_cam.vl["ES_DashStatus"]["Not_Ready_Startup"]
       self.es_accel_msg = copy.copy(cp_cam.vl["ES_CruiseThrottle"])
+      # FIXME: find Car_Follow signal for FORESTER_PREGLOBAL and WRX_PREGLOBAL
+      if self.car_fingerprint not in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
+        self.car_follow = cp_cam.vl["ES_DashStatus"]['Car_Follow']
+      self.close_distance = cp_cam.vl["ES_CruiseThrottle"]['Close_Distance']
     else:
       ret.steerWarning = cp.vl["Steering_Torque"]['Steer_Warning'] == 1
       ret.cruiseState.nonAdaptive = cp_cam.vl["ES_DashStatus"]['Conventional_Cruise'] == 1
-      if self.car_fingerprint == CAR.OUTBACK:
-        self.brake_msg = copy.copy(cp.vl["Brake_Pedal"])
-      else:
+      self.brake_pedal_msg = copy.copy(cp.vl["Brake_Pedal"])
+      if self.car_fingerprint != CAR.OUTBACK:
         self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
       self.es_lkas_msg = copy.copy(cp_cam.vl["ES_LKAS_State"])
+      if self.car_fingerprint == CAR.OUTBACK:
+        self.car_follow = cp_body.vl["ES_Distance"]['Car_Follow']
+        self.close_distance = cp_body.vl["ES_Distance"]['Close_Distance']
+      else:
+        self.car_follow = cp_cam.vl["ES_Distance"]['Car_Follow']
+        self.close_distance = cp_cam.vl["ES_Distance"]['Close_Distance']
+      self.cruise_state = cp_cam.vl["ES_DashStatus"]['Cruise_State']
 
     return ret
 
@@ -126,32 +141,40 @@ class CarState(CarStateBase):
       ("Steering_Torque", 50),
     ]
 
-    if CP.carFingerprint == CAR.OUTBACK:
+    if CP.carFingerprint in PREGLOBAL_CARS:
       signals += [
+        ("Throttle_Pedal", "Throttle", 0),
+        ("Counter", "Throttle", 0),
+        ("Signal1", "Throttle", 0),
+        ("Not_Full_Throttle", "Throttle", 0),
+        ("Signal2", "Throttle", 0),
+        ("Engine_RPM", "Throttle", 0),
+        ("Off_Throttle", "Throttle", 0),
+        ("Signal3", "Throttle", 0),
+        ("Throttle_Cruise", "Throttle", 0),
+        ("Throttle_Combo", "Throttle", 0),
+        ("Throttle_Body", "Throttle", 0),
+        ("Off_Throttle_2", "Throttle", 0),
+        ("Signal4", "Throttle", 0),
+      ]
+    else:
+      signals += [
+        ("Counter", "Throttle", 0),
+        ("Signal1", "Throttle", 0),
+        ("Engine_RPM", "Throttle", 0),
+        ("Signal2", "Throttle", 0),
+        ("Throttle_Pedal", "Throttle", 0),
+        ("Throttle_Cruise", "Throttle", 0),
+        ("Throttle_Combo", "Throttle", 0),
+        ("Signal1", "Throttle", 0),
+        ("Off_Accel", "Throttle", 0),
         ("Counter", "Brake_Pedal", 0),
         ("Signal1", "Brake_Pedal", 0),
-        ("Signal1", "Brake_Pedal", 0),
+        ("Speed", "Brake_Pedal", 0),
         ("Signal2", "Brake_Pedal", 0),
         ("Brake_Lights", "Brake_Pedal", 0),
         ("Signal3", "Brake_Pedal", 0),
         ("Signal4", "Brake_Pedal", 0),
-      ]
-    else:
-      signals += [
-        ("Cruise_On", "CruiseControl", 0),
-        ("Cruise_Activated", "CruiseControl", 0),
-        ("FL", "Wheel_Speeds", 0),
-        ("FR", "Wheel_Speeds", 0),
-        ("RL", "Wheel_Speeds", 0),
-        ("RR", "Wheel_Speeds", 0),
-      ]
-
-      checks += [
-        ("Wheel_Speeds", 50),
-      ]
-
-    if CP.carFingerprint not in PREGLOBAL_CARS:
-      signals += [
         ("Steer_Warning", "Steering_Torque", 0),
       ]
 
@@ -161,11 +184,21 @@ class CarState(CarStateBase):
       ]
 
       if CP.carFingerprint != CAR.OUTBACK:
-        checks += [
-         ("CruiseControl", 20),
+        signals += [
+          ("Cruise_On", "CruiseControl", 0),
+          ("Cruise_Activated", "CruiseControl", 0),
+          ("FL", "Wheel_Speeds", 0),
+          ("FR", "Wheel_Speeds", 0),
+          ("RL", "Wheel_Speeds", 0),
+          ("RR", "Wheel_Speeds", 0),
         ]
 
-    if CP.carFingerprint == CAR.FORESTER_PREGLOBAL:
+        checks += [
+          ("Wheel_Speeds", 50),
+          ("CruiseControl", 20),
+        ]
+
+    if CP.carFingerprint in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
       checks += [
         ("Dashlights", 20),
         ("BodyInfo", 1),
@@ -194,10 +227,13 @@ class CarState(CarStateBase):
         ("RL", "Wheel_Speeds", 0),
         ("RR", "Wheel_Speeds", 0),
         ("Brake", "Brake_Status", 0),
+        ("Car_Follow", "ES_Distance", 0),
+        ("Close_Distance", "ES_Distance", 0),
       ]
 
       checks += [
         ("CruiseControl", 20),
+        ("ES_Distance", 20),
         ("Wheel_Speeds", 50),
         ("Brake_Status", 50),
       ]
@@ -218,19 +254,24 @@ class CarState(CarStateBase):
         ("Cruise_Activated", "ES_CruiseThrottle", 0),
         ("Signal2", "ES_CruiseThrottle", 0),
         ("Brake_On", "ES_CruiseThrottle", 0),
-        ("DistanceSwap", "ES_CruiseThrottle", 0),
+        ("Distance_Swap", "ES_CruiseThrottle", 0),
         ("Standstill", "ES_CruiseThrottle", 0),
         ("Signal3", "ES_CruiseThrottle", 0),
-        ("CloseDistance", "ES_CruiseThrottle", 0),
+        ("Close_Distance", "ES_CruiseThrottle", 0),
         ("Signal4", "ES_CruiseThrottle", 0),
         ("Standstill_2", "ES_CruiseThrottle", 0),
-        ("ES_Error", "ES_CruiseThrottle", 0),
+        ("Cruise_Fault", "ES_CruiseThrottle", 0),
         ("Signal5", "ES_CruiseThrottle", 0),
         ("Counter", "ES_CruiseThrottle", 0),
         ("Signal6", "ES_CruiseThrottle", 0),
         ("Cruise_Button", "ES_CruiseThrottle", 0),
         ("Signal7", "ES_CruiseThrottle", 0),
       ]
+
+      if CP.carFingerprint not in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
+        signals += [
+          ("Car_Follow", "ES_DashStatus", 0),
+        ]
 
       checks = [
         ("ES_DashStatus", 20),
