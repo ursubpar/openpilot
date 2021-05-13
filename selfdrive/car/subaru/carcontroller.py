@@ -52,7 +52,8 @@ class CarController():
     throttle_cmd = False
     speed_cmd = False
 
-    if CS.wipers:
+    # manual sng trigger for debugging
+    if CS.CP.carFingerprint not in PREGLOBAL_CARS and CS.wipers:
       self.sng_acc_resume = True
 
     if CS.CP.carFingerprint in PREGLOBAL_CARS and CS.CP.carFingerprint not in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
