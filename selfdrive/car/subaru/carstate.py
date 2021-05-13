@@ -93,17 +93,17 @@ class CarState(CarStateBase):
     else:
       ret.steerWarning = cp.vl["Steering_Torque"]['Steer_Warning'] == 1
       ret.cruiseState.nonAdaptive = cp_cam.vl["ES_DashStatus"]['Conventional_Cruise'] == 1
+      self.cruise_state = cp_cam.vl["ES_DashStatus"]['Cruise_State']
       self.brake_pedal_msg = copy.copy(cp.vl["Brake_Pedal"])
-      if self.car_fingerprint != CAR.OUTBACK:
-        self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
       self.es_lkas_msg = copy.copy(cp_cam.vl["ES_LKAS_State"])
+      self.wipers = cp.vl["BodyInfo"]['WIPERS']
       if self.car_fingerprint == CAR.OUTBACK:
         self.car_follow = cp_body.vl["ES_Distance"]['Car_Follow']
         self.close_distance = cp_body.vl["ES_Distance"]['Close_Distance']
       else:
         self.car_follow = cp_cam.vl["ES_Distance"]['Car_Follow']
         self.close_distance = cp_cam.vl["ES_Distance"]['Close_Distance']
-      self.cruise_state = cp_cam.vl["ES_DashStatus"]['Cruise_State']
+        self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
 
     return ret
 
@@ -175,6 +175,7 @@ class CarState(CarStateBase):
         ("Signal3", "Brake_Pedal", 0),
         ("Signal4", "Brake_Pedal", 0),
         ("Steer_Warning", "Steering_Torque", 0),
+        ("WIPERS", "BodyInfo", 0),
       ]
 
       checks += [
