@@ -53,8 +53,8 @@ class CarController():
     speed_cmd = False
 
     # manual sng trigger for debugging
-    if CS.CP.carFingerprint not in PREGLOBAL_CARS and CS.wipers:
-      self.sng_acc_resume = True
+    #if CS.CP.carFingerprint not in PREGLOBAL_CARS and CS.wipers:
+    #  self.sng_acc_resume = True
 
     if CS.CP.carFingerprint in PREGLOBAL_CARS and CS.CP.carFingerprint not in [CAR.FORESTER_PREGLOBAL, CAR.WRX_PREGLOBAL]:
       if (enabled                                            # ACC active
@@ -73,7 +73,7 @@ class CarController():
             and CS.close_distance < 255                        # ignore max value
             and CS.close_distance > self.prev_close_distance): # distance with lead car is increasing
           self.sng_acc_resume = True
-        print("car_follow: %d cruise_state: %d close_distance: %d prev_close_distance: %d" % (CS.car_follow, CS.cruise_state, CS.close_distance, self.prev_close_distance))
+        #print("car_follow: %d cruise_state: %d close_distance: %d prev_close_distance: %d" % (CS.car_follow, CS.cruise_state, CS.close_distance, self.prev_close_distance))
       else:
           if (enabled                                          # ACC active
               and CS.car_follow == 1                           # lead car
