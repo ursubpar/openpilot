@@ -20,6 +20,9 @@ class CarInterface(CarInterfaceBase):
     if candidate in PREGLOBAL_CARS:
       ret.safetyModel = car.CarParams.SafetyModel.subaruLegacy
       ret.enableBsm = 0x25c in fingerprint[0]
+    elif candidate == CAR.CROSSTREK_2020H:
+      ret.safetyModel = car.CarParams.SafetyModel.subaruHybrid
+      ret.enableBsm = 0x228 in fingerprint[0]
     else:
       ret.safetyModel = car.CarParams.SafetyModel.subaru
       ret.enableBsm = 0x228 in fingerprint[0]
@@ -45,6 +48,16 @@ class CarInterface(CarInterfaceBase):
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.0025, 0.1], [0.00025, 0.01]]
 
     if candidate == CAR.IMPREZA:
+      ret.mass = 1568. + STD_CARGO_KG
+      ret.wheelbase = 2.67
+      ret.centerToFront = ret.wheelbase * 0.5
+      ret.steerRatio = 15
+      ret.steerActuatorDelay = 0.4   # end-to-end angle controller
+      ret.lateralTuning.pid.kf = 0.00005
+      ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0., 20.], [0., 20.]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.2, 0.3], [0.02, 0.03]]
+
+    if candidate == CAR.CROSSTREK_2020H:
       ret.mass = 1568. + STD_CARGO_KG
       ret.wheelbase = 2.67
       ret.centerToFront = ret.wheelbase * 0.5
@@ -109,10 +122,12 @@ class CarInterface(CarInterfaceBase):
   def update(self, c, can_strings):
     self.cp.update_strings(can_strings)
     self.cp_cam.update_strings(can_strings)
+    if self.cp_body:
+      self.cp_body.update_strings(can_strings)
 
-    ret = self.CS.update(self.cp, self.cp_cam)
+    ret = self.CS.update(self.cp, self.cp_cam, self.cp_body)
 
-    ret.canValid = self.cp.can_valid and self.cp_cam.can_valid
+    ret.canValid = self.cp.can_valid and self.cp_cam.can_valid and (self.cp_body is None or self.cp_body.can_valid)
     ret.steeringRateLimited = self.CC.steer_rate_limited if self.CC is not None else False
 
     ret.events = self.create_common_events(ret).to_msg()
