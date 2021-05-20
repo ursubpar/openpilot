@@ -226,17 +226,18 @@ class CarState(CarStateBase):
     checks = []
 
     if CP.carFingerprint == CAR.CROSSTREK_2020H:
-      signals = [
+      signals += [
         ("Throttle_Pedal", "Throttle_Hybrid", 0),
         ("Brake", "Brake_Hybrid", 0),
         ("Gear", "Transmission", 0),
       ]
 
-      checks = [
+      checks += [
         # sig_address, frequency
         ("Throttle_Hybrid", 50),
         ("Brake_Hybrid", 40),
         ("Transmission", 50),
+      ]
 
       return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 1)
 
