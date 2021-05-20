@@ -34,6 +34,7 @@ non_tested_cars = [
   TOYOTA.HIGHLANDERH_TSS2,
   SUBARU.CROSSTREK_2020H,
   SUBARU.WRX_PREGLOBAL,
+  SUBARU.OUTBACK,
 ]
 
 routes: dict = {
