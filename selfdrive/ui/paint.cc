@@ -5,8 +5,6 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-#include "common/util.h"
-#include "common/timing.h"
 
 #include <algorithm>
 
