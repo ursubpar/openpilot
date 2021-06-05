@@ -250,21 +250,9 @@ CONFIGS = [
     fake_pubsubmaster=True,
   ),
   ProcessConfig(
-    proc_name="radard",
-    pub_sub={
-      "can": ["radarState", "liveTracks"],
-      "liveParameters": [], "carState": [], "modelV2": [],
-    },
-    ignore=["logMonoTime", "valid", "radarState.cumLagMs"],
-    init_callback=get_car_params,
-    should_recv_callback=radar_rcv_callback,
-    tolerance=None,
-    fake_pubsubmaster=True,
-  ),
-  ProcessConfig(
     proc_name="plannerd",
     pub_sub={
-      "modelV2": ["lateralPlan"], "radarState": ["longitudinalPlan"],
+      "modelV2": ["lateralPlan", "longitudinalPlan"],
       "carState": [], "controlsState": [],
     },
     ignore=["logMonoTime", "valid", "longitudinalPlan.processingDelay"],
@@ -367,7 +355,8 @@ def python_replay_process(cfg, lr, fingerprint=None):
   # TODO: remove after getting new route for civic & accord
   migration = {
     "HONDA CIVIC 2016 TOURING": "HONDA CIVIC 2016",
-    "HONDA ACCORD 2018 SPORT 2T": "HONDA ACCORD 2T 2018",
+    "HONDA ACCORD 2018 SPORT 2T": "HONDA ACCORD 2018",
+    "HONDA ACCORD 2T 2018": "HONDA ACCORD 2018",
   }
 
   if fingerprint is not None:

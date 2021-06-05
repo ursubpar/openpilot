@@ -21,7 +21,6 @@ from selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from selfdrive.controls.lib.events import Events, ET
 from selfdrive.controls.lib.alertmanager import AlertManager
 from selfdrive.controls.lib.vehicle_model import VehicleModel
-from selfdrive.controls.lib.longitudinal_planner import LON_MPC_STEP
 from selfdrive.locationd.calibrationd import Calibration
 from selfdrive.hardware import HARDWARE, TICI
 
@@ -62,8 +61,8 @@ class Controls:
       ignore = ['driverCameraState', 'managerState'] if SIMULATION else None
       self.sm = messaging.SubMaster(['deviceState', 'pandaState', 'modelV2', 'liveCalibration',
                                      'driverMonitoringState', 'longitudinalPlan', 'lateralPlan', 'liveLocationKalman',
-                                     'managerState', 'liveParameters', 'radarState'] + self.camera_packets,
-                                     ignore_alive=ignore, ignore_avg_freq=['radarState', 'longitudinalPlan'])
+                                     'managerState', 'liveParameters'] + self.camera_packets,
+                                     ignore_alive=ignore, ignore_avg_freq=['longitudinalPlan'])
 
     self.can_sock = can_sock
     if can_sock is None:
@@ -231,9 +230,7 @@ class Controls:
     if not self.sm['liveParameters'].valid:
       self.events.add(EventName.vehicleModelInvalid)
 
-    if len(self.sm['radarState'].radarErrors):
-      self.events.add(EventName.radarFault)
-    elif not self.sm.valid["pandaState"]:
+    if not self.sm.valid["pandaState"]:
       self.events.add(EventName.usbError)
     elif not self.sm.all_alive_and_valid():
       self.events.add(EventName.commIssue)
@@ -272,7 +269,7 @@ class Controls:
             continue
 
           csid = m.split("CSID:")[-1].split(" ")[0]
-          evt = {"0": EventName.wideRoadCameraError, "1": EventName.roadCameraError,
+          evt = {"0": EventName.roadCameraError, "1": EventName.wideRoadCameraError,
                  "2": EventName.driverCameraError}.get(csid, None)
           if evt is not None:
             self.events.add(evt)
@@ -288,6 +285,8 @@ class Controls:
         self.events.add(EventName.cameraMalfunction)
       if self.sm['modelV2'].frameDropPerc > 20:
         self.events.add(EventName.modeldLagging)
+      if self.sm['liveLocationKalman'].excessiveResets:
+        self.events.add(EventName.localizerMalfunction)
 
       # Check if all manager processes are running
       not_running = set(p.name for p in self.sm['managerState'].processes if not p.running)
@@ -434,15 +433,8 @@ class Controls:
       self.LaC.reset()
       self.LoC.reset(v_pid=CS.vEgo)
 
-    long_plan_age = DT_CTRL * (self.sm.frame - self.sm.rcv_frame['longitudinalPlan'])
-    # no greater than dt mpc + dt, to prevent too high extraps
-    dt = min(long_plan_age, LON_MPC_STEP + DT_CTRL) + DT_CTRL
-
-    a_acc_sol = long_plan.aStart + (dt / LON_MPC_STEP) * (long_plan.aTarget - long_plan.aStart)
-    v_acc_sol = long_plan.vStart + dt * (a_acc_sol + long_plan.aStart) / 2.0
-
     # Gas/Brake PID loop
-    actuators.gas, actuators.brake = self.LoC.update(self.active, CS, v_acc_sol, long_plan.vTargetFuture, a_acc_sol, self.CP)
+    actuators.gas, actuators.brake = self.LoC.update(self.active, CS, long_plan.vStart, long_plan.vTargetFuture, long_plan.aStart, self.CP)
 
     # Steering PID loop and lateral MPC
     actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(self.active, CS, self.CP, self.VM, params, lat_plan)
@@ -468,7 +460,7 @@ class Controls:
         if left_deviation or right_deviation:
           self.events.add(EventName.steerSaturated)
 
-    return actuators, v_acc_sol, a_acc_sol, lac_log
+    return actuators, long_plan.vStart, long_plan.aStart, lac_log
 
   def publish_logs(self, CS, start_time, actuators, v_acc, a_acc, lac_log):
     """Send actuators and hud commands to the car, send controlsstate and MPC logging"""
@@ -485,7 +477,7 @@ class Controls:
     brake_discount = (1.0 - clip(actuators.brake * 3., 0.0, 1.0))
     speed_override = max(0.0, (self.LoC.v_pid + CS.cruiseState.speedOffset) * brake_discount)
     CC.cruiseControl.speedOverride = float(speed_override if self.CP.enableCruise else 0.0)
-    CC.cruiseControl.accelOverride = self.CI.calc_accel_override(CS.aEgo, self.sm['longitudinalPlan'].aTarget, CS.vEgo, self.sm['longitudinalPlan'].vTarget)
+    CC.cruiseControl.accelOverride = self.CI.calc_accel_override(CS.aEgo, self.sm['longitudinalPlan'].aStart, CS.vEgo, self.sm['longitudinalPlan'].vStart)
 
     CC.hudControl.setSpeed = float(self.v_cruise_kph * CV.KPH_TO_MS)
     CC.hudControl.speedVisible = self.enabled

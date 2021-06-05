@@ -214,7 +214,6 @@ selfdrive/common/i2c.h
 selfdrive/controls/__init__.py
 selfdrive/controls/controlsd.py
 selfdrive/controls/plannerd.py
-selfdrive/controls/radard.py
 selfdrive/controls/lib/__init__.py
 selfdrive/controls/lib/alertmanager.py
 selfdrive/controls/lib/alerts_offroad.json
@@ -229,14 +228,10 @@ selfdrive/controls/lib/lateral_planner.py
 selfdrive/controls/lib/lane_planner.py
 selfdrive/controls/lib/pid.py
 selfdrive/controls/lib/longitudinal_planner.py
-selfdrive/controls/lib/radar_helpers.py
 selfdrive/controls/lib/vehicle_model.py
 selfdrive/controls/lib/speed_smoother.py
-selfdrive/controls/lib/fcw.py
 selfdrive/controls/lib/long_mpc.py
 selfdrive/controls/lib/long_mpc_model.py
-
-selfdrive/controls/lib/cluster/*
 
 selfdrive/controls/lib/lateral_mpc/lib_mpc_export/*
 selfdrive/controls/lib/lateral_mpc/.gitignore
@@ -433,8 +428,12 @@ selfdrive/modeld/runners/run.h
 selfdrive/monitoring/dmonitoringd.py
 selfdrive/monitoring/driver_monitor.py
 
-selfdrive/assets
+selfdrive/assets/*.png
 selfdrive/assets/fonts/*.ttf
+selfdrive/assets/images/*
+selfdrive/assets/offroad/*
+selfdrive/assets/sounds/*
+selfdrive/assets/training/*
 
 phonelibs/SConscript
 
@@ -553,8 +552,7 @@ opendbc/gm_global_a_chassis.dbc
 opendbc/ford_fusion_2018_pt.dbc
 opendbc/ford_fusion_2018_adas.dbc
 
-opendbc/honda_accord_s2t_2018_can_generated.dbc
-opendbc/honda_accord_lx15t_2018_can_generated.dbc
+opendbc/honda_accord_2018_can_generated.dbc
 opendbc/acura_ilx_2016_can_generated.dbc
 opendbc/acura_rdx_2018_can_generated.dbc
 opendbc/acura_rdx_2020_can_generated.dbc

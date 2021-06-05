@@ -63,19 +63,14 @@ static int get_path_length_idx(const cereal::ModelDataV2::XYZTData::Reader &line
   return max_idx;
 }
 
-static void update_leads(UIState *s, const cereal::RadarState::Reader &radar_state, std::optional<cereal::ModelDataV2::XYZTData::Reader> line) {
-  for (int i = 0; i < 2; ++i) {
-    auto lead_data = (i == 0) ? radar_state.getLeadOne() : radar_state.getLeadTwo();
-    if (lead_data.getStatus()) {
-      float z = line ? (*line).getZ()[get_path_length_idx(*line, lead_data.getDRel())] : 0.0;
-      // negative because radarState uses left positive convention
-      calib_frame_to_full_frame(s, lead_data.getDRel(), -lead_data.getYRel(), z + 1.22, &s->scene.lead_vertices[i]);
-    }
-    s->scene.lead_data[i] = lead_data;
+static void update_leads(UIState *s, const cereal::ModelDataV2::LeadDataV3::Reader &lead_data, std::optional<cereal::ModelDataV2::XYZTData::Reader> line) {
+  if (lead_data.getProb() > 0.5) {
+    float z = line ? (*line).getZ()[get_path_length_idx(*line, lead_data.getX()[0])] : 0.0;
+    calib_frame_to_full_frame(s, lead_data.getX()[0], -lead_data.getY()[0], z + 1.22, &s->scene.lead_vertices[0]);
   }
-  s->scene.lead_v_rel = s->scene.lead_data[0].getVRel();
-  s->scene.lead_d_rel = s->scene.lead_data[0].getDRel();
-  s->scene.lead_status = s->scene.lead_data[0].getStatus();
+  s->scene.lead_v_rel = lead_data.getV()[0];
+  s->scene.lead_d_rel = lead_data.getX()[0];
+  s->scene.lead_status = lead_data.getProb() > 0.5;
 }
 
 static void update_line_data(const UIState *s, const cereal::ModelDataV2::XYZTData::Reader &line,
@@ -116,9 +111,9 @@ static void update_model(UIState *s, const cereal::ModelDataV2::Reader &model) {
   }
 
   // update path
-  auto lead_one = (*s->sm)["radarState"].getRadarState().getLeadOne();
-  if (lead_one.getStatus()) {
-    const float lead_d = lead_one.getDRel() * 2.;
+  auto lead_one = (*s->sm)["modelV2"].getModelV2().getLeads()[0];
+  if (lead_one.getProb() > 0.5) {
+    const float lead_d = lead_one.getX()[0] * 2.;
     max_distance = std::clamp((float)(lead_d - fmin(lead_d * 0.35, 10.)), 0.0f, max_distance);
   }
   max_idx = get_path_length_idx(model_position, max_distance);
@@ -146,12 +141,18 @@ static void update_state(UIState *s) {
     s->scene.steeringTorqueEps = scene.car_state.getSteeringTorqueEps();
   }
   // ENG UI END
-  if (sm.updated("radarState")) {
+
+  // update engageability and DM icons at 2Hz
+  if (sm.frame % (UI_FREQ / 2) == 0) {
+    scene.engageable = sm["controlsState"].getControlsState().getEngageable();
+    scene.dm_active = sm["driverMonitoringState"].getDriverMonitoringState().getIsActiveMode();
+  }
+  if (sm.updated("modelV2")) {
     std::optional<cereal::ModelDataV2::XYZTData::Reader> line;
     if (sm.rcv_frame("modelV2") > 0) {
       line = sm["modelV2"].getModelV2().getPosition();
     }
-    update_leads(s, sm["radarState"].getRadarState(), line);
+    update_leads(s, sm["modelV2"].getModelV2().getLeads()[0], line);
   }
   if (sm.updated("liveCalibration")) {
     scene.world_objects_visible = true;
@@ -233,7 +234,7 @@ static void update_state(UIState *s) {
 
     scene.light_sensor = std::clamp<float>((1023.0 / max_lines) * (max_lines - camera_state.getIntegLines() * gain), 0.0, 1023.0);
   }
-  scene.started = sm["deviceState"].getDeviceState().getStarted() || scene.driver_view;
+  scene.started = sm["deviceState"].getDeviceState().getStarted();
 }
 
 static void update_params(UIState *s) {
@@ -281,7 +282,6 @@ static void update_status(UIState *s) {
       s->status = STATUS_DISENGAGED;
       s->scene.started_frame = s->sm->frame;
 
-      s->scene.is_rhd = Params().getBool("IsRHD");
       s->scene.end_to_end = Params().getBool("EndToEndToggle");
       s->wide_camera = Hardware::TICI() ? Params().getBool("EnableWideCamera") : false;
 
@@ -289,9 +289,7 @@ static void update_status(UIState *s) {
       ui_resize(s, s->fb_w, s->fb_h);
 
       // Choose vision ipc client
-      if (s->scene.driver_view) {
-        s->vipc_client = s->vipc_client_front;
-      } else if (s->wide_camera){
+      if (s->wide_camera){
         s->vipc_client = s->vipc_client_wide;
       } else {
         s->vipc_client = s->vipc_client_rear;
@@ -306,8 +304,8 @@ static void update_status(UIState *s) {
 
 QUIState::QUIState(QObject *parent) : QObject(parent) {
   ui_state.sm = std::make_unique<SubMaster, const std::initializer_list<const char *>>({
-    "modelV2", "controlsState", "liveCalibration", "radarState", "deviceState", "liveLocationKalman",
-    "pandaState", "carParams", "driverState", "driverMonitoringState", "sensorEvents", "carState", "ubloxGnss",
+    "modelV2", "controlsState", "liveCalibration", "deviceState", "liveLocationKalman",
+    "pandaState", "carParams", "driverMonitoringState", "sensorEvents", "carState", "ubloxGnss",
     "gpsLocationExternal", "roadCameraState",
   });
 
@@ -318,7 +316,6 @@ QUIState::QUIState(QObject *parent) : QObject(parent) {
   ui_state.wide_camera = Hardware::TICI() ? Params().getBool("EnableWideCamera") : false;
 
   ui_state.vipc_client_rear = new VisionIpcClient("camerad", VISION_STREAM_RGB_BACK, true);
-  ui_state.vipc_client_front = new VisionIpcClient("camerad", VISION_STREAM_RGB_FRONT, true);
   ui_state.vipc_client_wide = new VisionIpcClient("camerad", VISION_STREAM_RGB_WIDE, true);
 
   ui_state.vipc_client = ui_state.vipc_client_rear;
@@ -350,8 +347,6 @@ void QUIState::update() {
 }
 
 Device::Device(QObject *parent) : brightness_filter(BACKLIGHT_OFFROAD, BACKLIGHT_TS, BACKLIGHT_DT), QObject(parent) {
-  brightness_b = Params(true).get<float>("BRIGHTNESS_B").value_or(10.0);
-  brightness_m = Params(true).get<float>("BRIGHTNESS_M").value_or(2.6) / 26.0;
 }
 
 void Device::update(const UIState &s) {
@@ -376,6 +371,8 @@ void Device::setAwake(bool on, bool reset) {
 }
 
 void Device::updateBrightness(const UIState &s) {
+  float brightness_b = 10;
+  float brightness_m = 0.1;
   float clipped_brightness = std::min(100.0f, (s.scene.light_sensor * brightness_m) + brightness_b);
   if (!s.scene.started) {
     clipped_brightness = BACKLIGHT_OFFROAD;
