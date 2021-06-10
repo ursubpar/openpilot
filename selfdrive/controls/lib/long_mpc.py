@@ -1,80 +1,58 @@
-import os
+import numpy as np
 import math
 
-import numpy as np
 from selfdrive.swaglog import cloudlog
 from common.realtime import sec_since_boot
-from selfdrive.controls.lib.longitudinal_mpc import libmpc_py
-from selfdrive.controls.lib.drive_helpers import MPC_COST_LONG
-
-LOG_MPC = os.environ.get('LOG_MPC', False)
+from selfdrive.controls.lib.longitudinal_mpc_lib import libmpc_py
 
 
 class LongitudinalMpc():
-  def __init__(self, mpc_id):
-    self.mpc_id = mpc_id
-
+  def __init__(self):
     self.reset_mpc()
-    self.lead_status = False
-    self.prev_lead_x = 0.0
-    self.new_lead = False
-
     self.last_cloudlog_t = 0.0
-    self.n_its = 0
+    self.ts = list(range(10))
+
 
   def reset_mpc(self):
-    ffi, self.libmpc = libmpc_py.get_libmpc(self.mpc_id)
-    self.libmpc.init(MPC_COST_LONG.TTC, MPC_COST_LONG.DISTANCE,
-                     MPC_COST_LONG.ACCELERATION, MPC_COST_LONG.JERK)
+    self.libmpc = libmpc_py.libmpc
+    self.libmpc.init(0.0, 1.0, 1.0, 10.0)
 
-    self.mpc_solution = ffi.new("log_t *")
-    self.cur_state = ffi.new("state_t *")
+    self.mpc_solution = libmpc_py.ffi.new("log_t *")
+    self.cur_state = libmpc_py.ffi.new("state_t *")
+
+    self.cur_state[0].x_ego = 0
     self.cur_state[0].v_ego = 0
     self.cur_state[0].a_ego = 0
+    self.min_a = -1.2
+    self.max_a = 1.2
+
+  def set_accel_limits(self, min_a, max_a):
+    self.min_a = min_a
+    self.max_a = max_a
 
   def set_cur_state(self, v, a):
+    self.cur_state[0].x_ego = 0.0
     self.cur_state[0].v_ego = v
     self.cur_state[0].a_ego = a
 
-  def update(self, CS, lead):
-    v_ego = CS.vEgo
-
-    # Setup current mpc state
-    self.cur_state[0].x_ego = 0.0
-
-    if lead is not None:
-      self.lead_status = lead.prob > 0.5
-      x_lead = lead.x[0]
-      v_lead = max(0.0, lead.v[0])
-      a_lead = lead.a[0]
-
-      if (v_lead < 0.1 or -a_lead / 2.0 > v_lead):
-        v_lead = 0.0
-        a_lead = 0.0
-
-      self.cur_state[0].x_l = x_lead
-      self.cur_state[0].v_l = v_lead
+  def update(self, carstate, model, v_cruise):
+    v_cruise_clipped = np.clip(v_cruise, self.cur_state[0].v_ego - 10., self.cur_state[0].v_ego + 10.0)
+    mpc_t = [0.0, .2, .4, .6, .8] + list(np.arange(1.0, 10.1, .6))
+    poss = v_cruise_clipped * np.array(mpc_t)
+    speeds = v_cruise_clipped * np.ones(len(mpc_t))
+    accels = np.zeros(len(mpc_t))
 
     # Calculate mpc
-    t = sec_since_boot()
-    model_t = [0., 2., 4., 6., 8., 10.]
-    mpc_t = [0.0, .2, .4, .6, .8] + list(np.arange(1.0, 10.1, .6))
-    lead_x_interp = np.interp(mpc_t, model_t, lead.x) - 2.0
-    lead_v_interp = np.interp(mpc_t, model_t, lead.v)
-    self.n_its = self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
-                                     list(lead_x_interp), list(lead_v_interp))
+    self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
+                        list(poss), list(speeds), list(accels),
+                        self.min_a, self.max_a)
 
     # Reset if NaN or goes through lead car
-    crashing = any(lead - ego < -50 for (lead, ego) in zip(lead_x_interp, self.mpc_solution[0].x_ego))
     nans = any(math.isnan(x) for x in self.mpc_solution[0].v_ego)
-    backwards = min(self.mpc_solution[0].v_ego) < -0.01
 
-    if (backwards or crashing or nans):
+    t = sec_since_boot()
+    if nans:
       if t > self.last_cloudlog_t + 5.0:
         self.last_cloudlog_t = t
-        cloudlog.warning("Longitudinal mpc %d reset - backwards: %s crashing: %s nan: %s" % (
-                          self.mpc_id, backwards, crashing, nans))
-
+        cloudlog.warning("Longitudinal model mpc reset - nans")
       self.reset_mpc()
-      self.cur_state[0].v_ego = v_ego
-      self.prev_lead_status = False
