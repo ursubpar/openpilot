@@ -70,16 +70,17 @@ class CarState(CarStateBase):
       self.ready = not cp_cam.vl["ES_DashStatus"]["Not_Ready_Startup"]
       self.es_accel_msg = copy.copy(cp_cam.vl["ES_CruiseThrottle"])
       if self.car_fingerprint in PREGLOBAL_CARS_SNG:
-        self.car_follow = cp_cam.vl["ES_DashStatus"]['Car_Follow']
-      self.close_distance = cp_cam.vl["ES_CruiseThrottle"]['Close_Distance']
+        self.car_follow = cp_cam.vl["ES_DashStatus"]["Car_Follow"]
+      self.close_distance = cp_cam.vl["ES_CruiseThrottle"]["Close_Distance"]
     else:
       ret.steerWarning = cp.vl["Steering_Torque"]["Steer_Warning"] == 1
       ret.cruiseState.nonAdaptive = cp_cam.vl["ES_DashStatus"]["Conventional_Cruise"] == 1
       self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
       self.es_lkas_msg = copy.copy(cp_cam.vl["ES_LKAS_State"])
-      self.car_follow = cp_cam.vl["ES_Distance"]['Car_Follow']
-      self.close_distance = cp_cam.vl["ES_Distance"]['Close_Distance']
-      self.cruise_state = cp_cam.vl["ES_DashStatus"]['Cruise_State']
+      self.car_follow = cp_cam.vl["ES_Distance"]["Car_Follow"]
+      self.close_distance = cp_cam.vl["ES_Distance"]["Close_Distance"]
+      self.cruise_state = cp_cam.vl["ES_DashStatus"]["Cruise_State"]
+    self.throttle_msg = copy.copy(cp.vl["Throttle"])
 
     return ret
 
@@ -227,6 +228,7 @@ class CarState(CarStateBase):
       signals = [
         ("Cruise_Set_Speed", "ES_DashStatus", 0),
         ("Conventional_Cruise", "ES_DashStatus", 0),
+        ("Cruise_State", "ES_DashStatus", 0),
 
         ("Counter", "ES_Distance", 0),
         ("Signal1", "ES_Distance", 0),
@@ -271,9 +273,9 @@ class CarState(CarStateBase):
         ("ES_LKAS_State", 10),
       ]
 
-      if CP.carFingerprint in PREGLOBAL_CARS_SNG:
-        signals += [
-          ("Car_Follow", "ES_DashStatus", 0),
-        ]
+    if CP.carFingerprint in PREGLOBAL_CARS_SNG:
+      signals += [
+        ("Car_Follow", "ES_DashStatus", 0),
+      ]
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 2)
