@@ -69,11 +69,17 @@ class CarState(CarStateBase):
       self.cruise_button = cp_cam.vl["ES_CruiseThrottle"]["Cruise_Button"]
       self.ready = not cp_cam.vl["ES_DashStatus"]["Not_Ready_Startup"]
       self.es_accel_msg = copy.copy(cp_cam.vl["ES_CruiseThrottle"])
+      if self.car_fingerprint in PREGLOBAL_CARS_SNG:
+        self.car_follow = cp_cam.vl["ES_DashStatus"]['Car_Follow']
+      self.close_distance = cp_cam.vl["ES_CruiseThrottle"]['Close_Distance']
     else:
       ret.steerWarning = cp.vl["Steering_Torque"]["Steer_Warning"] == 1
       ret.cruiseState.nonAdaptive = cp_cam.vl["ES_DashStatus"]["Conventional_Cruise"] == 1
       self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
       self.es_lkas_msg = copy.copy(cp_cam.vl["ES_LKAS_State"])
+      self.car_follow = cp_cam.vl["ES_Distance"]['Car_Follow']
+      self.close_distance = cp_cam.vl["ES_Distance"]['Close_Distance']
+      self.cruise_state = cp_cam.vl["ES_DashStatus"]['Cruise_State']
 
     return ret
 
@@ -88,7 +94,6 @@ class CarState(CarStateBase):
       ("Cruise_On", "CruiseControl", 0),
       ("Cruise_Activated", "CruiseControl", 0),
       ("Brake_Pedal", "Brake_Pedal", 0),
-      ("Throttle_Pedal", "Throttle", 0),
       ("LEFT_BLINKER", "Dashlights", 0),
       ("RIGHT_BLINKER", "Dashlights", 0),
       ("SEATBELT_FL", "Dashlights", 0),
@@ -127,8 +132,43 @@ class CarState(CarStateBase):
         ("BSD_RCTA", 17),
       ]
 
-    if CP.carFingerprint not in PREGLOBAL_CARS:
+    if CP.carFingerprint in PREGLOBAL_CARS:
+       signals += [
+        ("Throttle_Pedal", "Throttle", 0),
+        ("Counter", "Throttle", 0),
+        ("Signal1", "Throttle", 0),
+        ("Not_Full_Throttle", "Throttle", 0),
+        ("Signal2", "Throttle", 0),
+        ("Engine_RPM", "Throttle", 0),
+        ("Off_Throttle", "Throttle", 0),
+        ("Signal3", "Throttle", 0),
+        ("Throttle_Cruise", "Throttle", 0),
+        ("Throttle_Combo", "Throttle", 0),
+        ("Throttle_Body", "Throttle", 0),
+        ("Off_Throttle_2", "Throttle", 0),
+        ("Signal4", "Throttle", 0),
+      ]
+
+    else:
       signals += [
+        ("Counter", "Throttle", 0),
+        ("Signal1", "Throttle", 0),
+        ("Engine_RPM", "Throttle", 0),
+        ("Signal2", "Throttle", 0),
+        ("Throttle_Pedal", "Throttle", 0),
+        ("Throttle_Cruise", "Throttle", 0),
+        ("Throttle_Combo", "Throttle", 0),
+        ("Signal1", "Throttle", 0),
+        ("Off_Accel", "Throttle", 0),
+
+        ("Counter", "Brake_Pedal", 0),
+        ("Signal1", "Brake_Pedal", 0),
+        ("Speed", "Brake_Pedal", 0),
+        ("Signal2", "Brake_Pedal", 0),
+        ("Brake_Lights", "Brake_Pedal", 0),
+        ("Signal3", "Brake_Pedal", 0),
+        ("Signal4", "Brake_Pedal", 0),
+
         ("Steer_Warning", "Steering_Torque", 0),
       ]
 
@@ -230,5 +270,10 @@ class CarState(CarStateBase):
         ("ES_Distance", 20),
         ("ES_LKAS_State", 10),
       ]
+
+      if CP.carFingerprint in PREGLOBAL_CARS_SNG:
+        signals += [
+          ("Car_Follow", "ES_DashStatus", 0),
+        ]
 
     return CANParser(DBC[CP.carFingerprint]["pt"], signals, checks, 2)
