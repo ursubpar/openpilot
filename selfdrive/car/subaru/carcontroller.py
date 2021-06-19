@@ -47,7 +47,6 @@ class CarController():
     # *** stop and go ***
 
     throttle_cmd = False
-    speed_cmd = False
 
     if CS.CP.carFingerprint in PREGLOBAL_CARS_SNG:
       if (enabled                                            # ACC active
