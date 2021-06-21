@@ -53,7 +53,7 @@ class CarState(CarStateBase):
 
     if self.car_fingerprint not in PREGLOBAL_CARS and cp.vl["Dashlights"]["UNITS"] == 1:
       ret.cruiseState.speed *= CV.MPH_TO_KPH
-    elif cp.vl["Dash_State2"]["Units"] == 1:
+    elif self.car_fingerprint in PREGLOBAL_CARS cp.vl["Dash_State2"]["Units"] == 1:
       ret.cruiseState.speed *= CV.MPH_TO_KPH
 
     ret.seatbeltUnlatched = cp.vl["Dashlights"]["SEATBELT_FL"] == 1
