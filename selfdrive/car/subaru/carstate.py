@@ -123,7 +123,7 @@ class CarState(CarStateBase):
 
     if CP.carFingerprint in PREGLOBAL_CARS:
       signals += [
-        ("Units", "Dash_State2")
+        ("Units", "Dash_State2", 0),
       ]
 
       checks += [
